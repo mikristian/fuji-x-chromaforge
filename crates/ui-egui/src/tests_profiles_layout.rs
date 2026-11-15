@@ -1,0 +1,106 @@
+//! The profile browser in a narrow right panel: names stay inside their cells (#1634).
+
+use egui::{Rect, pos2, vec2};
+use serde_json::json;
+
+use crate::{LccApp, Services, headless::{Headless, HeadlessView}};
+use std::time::Duration;
+
+const LONG_ID: &str = "lut:kodak-portra-400-plus-one-stop-overexposed";
+const LONG_NAME: &str = "Kodak Portra 400 Plus One Stop Overexposed";
+
+fn text_shapes(shape: &egui::Shape, out: &mut Vec<egui::epaint::TextShape>) {
+    match shape {
+        egui::Shape::Text(text) => out.push(text.clone()),
+        egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| text_shapes(s, out)),
+        _ => {}
+    }
+}
+
+fn panel(width: f32) -> (Vec<egui::epaint::TextShape>, Vec<(String, Rect)>) {
+    let mut app = LccApp::new(lcc_engine::Session::with_demo(), Services::default());
+    app.session.lut_profiles.push(lcc_engine::cmd::lut_profiles::LutProfile {
+        id: LONG_ID.into(),
+        name: LONG_NAME.into(),
+        group: "Film Stocks".into(),
+        file: String::new(),
+    });
+    app.run("develop.profile", json!({"id": LONG_ID})).unwrap();
+    // every group open (only the applied profile's opens by itself, as in Lightroom Classic)
+    for g in lcc_engine::presets::profile_groups() {
+        app.ui.group_open.insert(format!("profile:{g}"), true);
+    }
+    let photo = app.session.active().unwrap();
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    crate::theme::apply(&ctx);
+    let mut texts = Vec::new();
+    let mut widgets = Vec::new();
+    for frame in 0..3 {
+        let raw = HeadlessView::raw_input(vec2(width, 4000.0), 1.0, frame as f64 / 60.0, vec![]);
+        let mut out = ctx.run_ui(raw, |ui| {
+            egui::CentralPanel::default().frame(egui::Frame::NONE).show(ui, |ui| {
+                crate::panels::profiles::show(&mut app, ui, photo);
+            });
+        });
+        out.textures_delta.clear();
+        texts.clear();
+        for shape in &out.shapes {
+            text_shapes(&shape.shape, &mut texts);
+        }
+        widgets = crate::widgets::take_registry(&ctx);
+    }
+    (texts, widgets)
+}
+
+#[test]
+fn profile_names_stay_inside_their_cells_in_a_narrow_panel() {
+    let width = 250.0;
+    let (texts, widgets) = panel(width);
+    let cell = widgets.iter().find(|(id, _)| id == &format!("profileCell:{LONG_ID}")).unwrap().1;
+    // the cell's name sits below its thumbnail; the header's copy is above every cell
+    let name = texts.iter().find(|t| t.galley.job.text == LONG_NAME && t.pos.y >= cell.top()).unwrap();
+    assert!(name.galley.elided, "a name wider than its cell is cut short");
+    let bounds = name.visual_bounding_rect();
+    assert!(bounds.left() >= cell.left() && bounds.right() <= cell.right(), "{bounds:?} spills out of {cell:?}");
+    let applied = texts.iter().find(|t| t.galley.job.text == LONG_NAME && t.pos.y < cell.top()).unwrap();
+    assert!(applied.visual_bounding_rect().right() <= width, "the applied profile's name leaves the panel");
+    // built-in names too: each one stays out of its neighbour's cell
+    for p in lcc_engine::presets::PROFILES {
+        let cell = widgets.iter().find(|(id, _)| id == &format!("profileCell:{}", p.id)).unwrap().1;
+        let name = texts.iter().find(|t| t.galley.job.text == p.name && cell.contains(pos2(cell.center().x, t.pos.y))).unwrap();
+        let bounds = name.visual_bounding_rect();
+        assert!(bounds.left() >= cell.left() && bounds.right() <= cell.right(), "{}: {bounds:?} spills out of {cell:?}", p.name);
+    }
+}
+
+/// Fuji camera recipes are preview-only on hover: the photo's settings and
+/// history stay untouched, and moving the mouse away restores the loupe.
+#[test]
+fn fujifilm_backup_slots_preview_in_the_native_profiles_browser() {
+    let app = LccApp::new(lcc_engine::Session::with_demo(), Services { png: None, ..Default::default() });
+    let mut h = Headless::new(app, [1400.0, 1000.0], 1.0);
+    let timeout = Duration::from_secs(40);
+    assert_eq!(h.request("ui.set", json!({"view":"detail"}), timeout)["ok"], true);
+    assert_eq!(h.request("engine.execute", json!({"command":"panel.profiles"}), timeout)["ok"], true);
+    h.step();
+    h.step();
+    for id in ["fujixProfileGroup:original-backups", "fujixProfileGroup:source-backup-1"] {
+        assert_eq!(h.request("ui.clickWidget", json!({"id":id}), timeout)["ok"], true, "{id}");
+        h.step();
+    }
+    let photo_id = h.app.session.active().unwrap();
+    let before = h.app.session.develop_of(photo_id).unwrap();
+    let commits = h.app.session.commits();
+    assert_eq!(h.request("ui.hoverWidget", json!({"id":"fujixProfileGroup:source-backup-1-slot-2"}), timeout)["ok"], true);
+    h.step();
+    let preview = h.app.hover_preview.as_ref().expect("Fujifilm C2 slot hover sets a transient preview");
+    assert!(preview.label.contains("Cinestill 800t"), "{}", preview.label);
+    assert!(preview.label.contains("approximate"), "the preview must disclose its approximate nature");
+    assert_ne!(preview.settings.profile.id, before.profile.id);
+    assert_eq!(*h.app.session.develop_of(photo_id).unwrap(), *before, "hover must not change saved Develop settings");
+    assert_eq!(h.app.session.commits(), commits, "no undo or edit on hover");
+    assert_eq!(h.request("ui.move", json!({"x":4,"y":500}), timeout)["ok"], true);
+    h.step();
+    assert!(h.app.hover_preview.is_none(), "moving away ends the temporary camera look");
+}

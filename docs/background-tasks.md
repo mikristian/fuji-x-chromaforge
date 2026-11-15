@@ -1,0 +1,100 @@
+# Long-running tasks and the activity stack
+
+Everything that takes a while runs off the UI thread and shows up in **one** place: the activity stack in the
+top-left corner under the top bar (issue #345). Each task has a row with its name, a progress bar (a sweep while
+the amount of work isn't known), the count and what it's working on, and ✕ if it can stop. Quitting asks first while
+a task that can stop is running. Agents see the same list through `activity.list` / `activity.cancel`, and
+`ui.inspect` reports it as `activity`.
+
+The registry is `lcc_engine::activity` (`crates/engine/src/activity.rs`, `Session::activity`). The stack is
+`crates/ui-egui/src/panels/activity.rs`. Every job that can last more than a moment uses it; **don't add a progress
+window, panel or progress toast of your own**. A dialog may still show progress inline (the Synchronize Folder
+dialog counts files while it scans), and a toast at the end saying what happened is fine. A view saying its pixels
+aren't final isn't progress either: the loupe's "Rendering…" pill (`loupe:rendering`) marks a stand-in or an
+out-of-date render on the photo itself, and the render behind it holds no row (a slider drag replaces it many times a
+second).
+
+## Adding a task
+
+```rust
+use lcc_engine::activity::{Cancel, Unit};
+
+// when the job starts, with the cancel flag the worker already checks between files
+let guard = app.session.activity.start("export", "Exporting", Cancel::Flag(cancel.clone()));
+guard.progress(0, total as u64);
+
+// every frame (or from the worker, through `guard.handle()`)
+guard.progress(done as u64, total as u64);
+guard.detail(&file_name);
+```
+
+- **Keep the guard for exactly as long as the job runs.** Put it in the struct the UI polls (`ExportTask`, `ScanTask`,
+  `SyncRun`…), or move it into the worker thread. Dropping it removes the row, also when the worker panics, so a
+  dead job never leaves a stuck bar. A worker that only reports progress takes a `TaskHandle` (`guard.handle()`,
+  `Clone + Send`).
+- **`kind`** is a stable camelCase id that agents filter by (`export`, `import`, `scan`, `sync`, `previews`,
+  `download`, `faces`, `cache`, `focus`, `fill`, `sidecars`, `saveMetadata`, `readMetadata`, `mlIndex`…). **`label`** is a short English name in sentence case ("Building previews"). The stack shows it
+  translated, so add it to every catalog in `crates/ui-egui/locales/`.
+- **Progress:** `progress(done, total)`. A `total` of 0 means the amount of work isn't known yet, and the bar sweeps.
+  `set_unit(Unit::Bytes)` makes the count read "12 of 340 MB"; `Unit::Percent` reads "40 %". The default `Unit::Count`
+  reads "3 of 25".
+- **Detail:** what the job is on (a file name, a model's name). Detail set by engine code is a name, never a sentence.
+  UI code may set translated text.
+- **Cancel:**
+  - `Cancel::Flag(Arc<AtomicBool>)` adopts the flag the job already checks. The row's ✕, `activity.cancel` and the
+    job's own Cancel then all set the same atomic.
+  - `Cancel::Yes`: the job polls `guard.is_cancelled()` itself.
+  - `Cancel::No`: the job can't stop; it gets no ✕ and doesn't make Quit ask.
+  - `set_cancellable(false)` for a phase that has to finish once started (a Lightroom import adding its photos).
+- **Quiet periodic work** shows no row: the auto-import folder listing runs every few seconds through
+  `tasks::spawn(.., None, ..)`.
+
+## Batches: one row for a job over many photos
+
+A job that works through many photos (AI Denoise, export) shows **one** row for the whole batch: "AI Denoise · 37 of 200 · about 6 min left · 2 failed".
+
+```rust
+let batch = session.activity.start_batch("denoise", "AI Denoise", Cancel::Yes);
+batch.progress(0, photos as u64);        // the total; `item_done` keeps counting past a short one
+batch.item_done();                       // a photo finished
+batch.item_failed("IMG_2.CR3: why");     // a photo failed (counted in done too; the reason is kept)
+let photo = batch.child("denoise", "AI Denoise"); // the photo in progress, under the batch
+```
+
+- **Counts:** `item_done` / `item_failed` count one photo each. A job that sets `progress(done, total)` itself counts
+  a failure with `count_failed(why)` (it doesn't add to `done`).
+- **Time left:** `etaMs` comes from the time per photo measured since the first one was done (a slow start, such as
+  loading a model, doesn't stretch it). The stack words it ("about 6 min left").
+- **Per-photo rows:** `child` (or `Activity::start_child(parent_id, ..)` from a worker that only has the id) puts a
+  row under the batch. The stack folds them away ("Show each photo (3)"). A child of `child` shares the batch's cancel
+  flag: ✕ on the batch stops them too.
+- **The end:** dropping the batch's guard leaves a `BatchSummary` (`activity.list` → `finished`): done, failed, the
+  first reasons, cancelled. The desktop app says it once ("AI Denoise: 198 done, 2 failed: IMG_2.CR3: why"), unless
+  the job reports itself (`reports_itself()`: an export's own message).
+
+## Examples in the code
+
+| Job | Where | Shows how to |
+|---|---|---|
+| Export, contact sheet | `crates/ui-egui/src/export_task.rs` | adopt the job's flag; update the row each frame; an export is a batch that reports itself, its failures counted when it ends |
+| Build Previews | `crates/engine/src/cmd/previews.rs` | move the guard into the worker thread |
+| Slideshow export | `crates/engine/src/cmd/slideshow.rs`, `crates/engine/src/slideshow_export.rs` | an engine command that owns its worker and row; progress from the worker through a `TaskHandle`; results read back by command |
+| Folder metadata save / read | `crates/engine/src/cmd/folder_metadata.rs` | a job that needs the session, so a per-frame pump (`folder.metadataPump`) does a few photos at a time and the row's flag stops it |
+| Model downloads | `crates/engine/src/face_download.rs` | report progress through a `TaskHandle` in shared state |
+| Lightroom catalog import | `crates/ui-egui/src/lightroom_import.rs` | stop being cancellable for a phase that must finish |
+| Face scan | `crates/engine/src/cmd/face_recognize.rs` | a continuous job with no ✕, kept in session state |
+| Filling spots | `crates/ui-egui/src/render.rs` (`Renderer::track_fills`) | a row held while a render that solves a content-aware fill is out, with no ✕ (`Cancel::No`); solved fills are cached, so it shows for a new fill only |
+| AI Denoise | `crates/engine/src/denoise.rs` (`denoise_track`) | a continuous queue shown as a batch while busy (photos counted since it was last idle), the running photo's tiles as its child; ✕ empties the queue and holds those photos until asked for again |
+| Find Missing Photos | `crates/ui-egui/src/tasks.rs` | a generic background task with a row (`kind: Some(..)`) |
+| Background XMP sidecar writes | `crates/engine/src/sidecar_writer.rs` | one row per batch from a worker thread, no ✕; the stack's 0.5 s delay keeps a quick write after an edit from showing |
+| Reload from Disk | `crates/ui-egui/src/reload.rs`, `crates/engine/src/cmd/reload.rs` | a command split into plan / probe / apply so the app reads the files on a worker thread (`tasks::spawn_tracked`: progress and `Cancel::Flag`); the result is committed through `Session::execute_fn` (undo step, save, XMP auto-write), and dropped for a photo a later-started reload has already updated; `wait: true` runs it in place |
+| Reading focus points | `crates/engine/src/focus_scan.rs` | a worker paced by the UI's per-frame pump (`focus.pump {pace}`); `Cancel::Flag`; commits in batches without undo steps |
+| AI jobs (models) | `crates/ml/src/queue.rs`, `crates/engine/src/ml.rs` | a queue in a crate below the engine that holds its row through a small trait (`lcc_ml::Rows`); the worker makes the batch row when work arrives and drops it when idle; the row's ✕ is the batch's `Cancel::Flag` (`docs/ml-backend.md`) |
+| Camera sensor maps, Remove Dust on a selection | `crates/engine/src/cmd/sensor.rs` | one job in session state; results applied on the UI thread by a pump (`dust.pump`) |
+
+## Testing
+
+Assert the row (`session.activity.list()`: kind, label, total, `cancellable`), that `activity.cancel(id)` stops the
+job, and that the row is gone once the job ends. `crates/ui-egui/src/tests_activity.rs` has the helpers, and the
+job-specific tests show the pattern (`tests_sync.rs`, `export_task.rs`, `tests_denoise.rs`…). A row only appears
+on screen once its task is 0.5 s old, so tests that click its ✕ wait for `activity:cancel:<id>` first.

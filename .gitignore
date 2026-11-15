@@ -1,0 +1,44 @@
+*~
+# Planning documents are local-only (not published)
+/plan/
+/plans/
+/PLAN.md
+/PLAN_phase_*.md
+/target
+/target-*/
+/dist
+# Play Store bundles and signing notes, built locally for a manual upload
+/play-store/
+/corpus
+/log
+.DS_Store
+.claude/
+/craft-fonts
+# nix build / nix develop
+/result
+/result-*
+# model weights are never committed (SAM 3: docs/ai-masks.md)
+*.safetensors
+*.safetensors.part
+
+# aider
+.aider*
+__pycache__/
+
+# Local FujiX data and private machine state
+*.app/
+*.dmg
+*.raf
+*.RAF
+*.CR3
+*.jpg
+*.jpeg
+*.heic
+.env*
+!.env.example
+**/recipe-drafts.json
+**/camera-profile*.json
+**/camera-backup*.json
+# GitHub Actions files require an OAuth workflow scope not granted to this
+# source-only publication. Re-enable explicitly with a workflow-authorized token.
+.github/workflows/
