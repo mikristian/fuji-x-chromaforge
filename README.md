@@ -1,10 +1,22 @@
-> **FujiX local fork:** See [FUJIX-PUBLICATION.md](FUJIX-PUBLICATION.md) for X100VI capabilities, disabled/unproven physical camera writes, missing private creator recipe data and installed-binary parity limitations. This local publication branch contains newer source than the verified installed app.
+> **Original open-source ChromaForge:** [emmertex/chromaforge](https://github.com/emmertex/chromaforge). FujiX ChromaForge is a source fork of that project, based on upstream commit `b8a1b8b1f96020a2bc1efd3d2e89d46cb42498af` with FujiX additions. The upstream editor itself descends from [storytold/lightcraft](https://github.com/storytold/lightcraft). See [LICENSE](LICENSE), [NOTICE](NOTICE), and [assets/ATTRIBUTION.md](assets/ATTRIBUTION.md) for original authors and license notices.
+
+> **FujiX local fork:** See [FUJIX-PUBLICATION.md](FUJIX-PUBLICATION.md) for X100VI capabilities, disabled/unproven physical camera writes, withheld private creator recipe data and installed-binary parity limitations. This source branch contains newer code than the verified installed app.
 
 > **FujiX documentation:** [Source architecture and capability diagram](docs/fujix-source-guide.md) covers Rust modules, Fuji MakerNote reading, build instructions, upstream provenance and remaining X100VI verification work. Its SVG is an illustrative schematic, not a camera or desktop screenshot. Existing demo interface screenshots below originated in the upstream project and should be attributed to that source, not represented as a new FujiX camera test.
 
 The FujiX-specific source overview is shown below; this drawing was authored from source structure and contains no third-party photograph or camera-session evidence.
 
 ![Illustrative FujiX Rust module overview](docs/images/fujix-source-map.svg)
+
+## FujiX native interface screenshots
+
+These are **cropped genuine screenshots of the FujiX ChromaForge native application, captured November 5, 2026**, showing only the editing controls and the Fujifilm X100VI recipe panel. Photos, thumbnail strips, desktop information and personal files are outside the crops. The current public source has not been rebuilt to establish exact installed-app parity; the camera section is a software interface, not evidence of successful physical camera programming.
+
+| RAW editing controls | Fujifilm recipe panel and histogram |
+| --- | --- |
+| ![Native ChromaForge editing sidebar: histogram and editing controls](docs/screenshots/native-editor-controls.png) | ![Native FujiX ChromaForge sidebar with histogram and X100VI camera recipe tools](docs/screenshots/native-fuji-panel.png) |
+
+For complete **upstream ChromaForge desktop screenshots**, consult the original [emmertex/chromaforge README](https://github.com/emmertex/chromaforge#features) and the included, attributed [upstream UI gallery](docs/images/classic/). See [screenshot provenance](docs/screenshots/README.md).
 
 <p align="center">
   <img alt="" src="brand/logo.svg" width="128">
