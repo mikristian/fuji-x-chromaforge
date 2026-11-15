@@ -20,4 +20,4 @@ log = { workspace = true }
 [target.'cfg(target_os = "android")'.dependencies]
 # pure Rust (MIT/Apache-2.0); the same versions eframe's winit already brings in
 android-activity = { version = "0.6", default-features = false, features = ["native-activity"] }
-jni = "0.21"
+jni = "0.22"
