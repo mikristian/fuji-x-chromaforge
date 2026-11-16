@@ -20,12 +20,12 @@ lcc-sysmem = { workspace = true }
 sha2 = { workspace = true }
 # precompressed web bundle (`cargo xtask web`); pure Rust
 flate2 = "1"
-brotli = { version = "8", default-features = false, features = ["std"] }
+brotli = { version = "9", default-features = false, features = ["std"] }
 # ci/quarantine.toml
 toml = "1"
 # `cargo xtask update-key`: the release's signed SHA256SUMS.txt
 ed25519-dalek = { workspace = true }
 base64 = { workspace = true }
-getrandom = "0.3"
+getrandom = "0.4"
 # `cargo xtask android package`: assembling the APK / AAB (stored entries only: aapt2 compresses its own)
 zip = { version = "9", default-features = false }

@@ -19,9 +19,9 @@ getrandom = { workspace = true }
 sha2 = { workspace = true }
 ed25519-dalek = { workspace = true }
 # pure Rust (RustCrypto / dalek, MIT/Apache-2.0), the versions already in the lock
-x25519-dalek = { version = "2", default-features = false, features = ["static_secrets", "zeroize"] }
-hkdf = "0.12"
-chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+x25519-dalek = { version = "3", default-features = false, features = ["static_secrets", "zeroize"] }
+hkdf = "0.13"
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
 # SO_REUSEADDR / SO_REUSEPORT on the mDNS socket (several copies of the app on one machine)
 socket2 = { version = "0.6", features = ["all"] }
 

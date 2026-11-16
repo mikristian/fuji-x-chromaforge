@@ -12,11 +12,11 @@ workspace = true
 lcc-text = { workspace = true }
 pdf-writer = "0.15"
 subsetter = { version = "0.2", default-features = false }
-skrifa = "0.44"
+skrifa = "0.49"
 miniz_oxide = { workspace = true }
 
 [dev-dependencies]
 lcc-fuzzkit = { workspace = true }
 lcc-testkit = { workspace = true }
-lopdf = { version = "0.45", default-features = false }
-hayro = { version = "0.8", default-features = false }
+lopdf = { version = "0.47", default-features = false }
+hayro = { version = "0.9", default-features = false }
