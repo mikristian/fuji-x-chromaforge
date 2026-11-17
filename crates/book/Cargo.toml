@@ -20,5 +20,5 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 lcc-fuzzkit = { workspace = true }
-lopdf = { version = "0.45", default-features = false }
-hayro = { version = "0.8", default-features = false }
+lopdf = { version = "0.47", default-features = false }
+hayro = { version = "0.9", default-features = false }
