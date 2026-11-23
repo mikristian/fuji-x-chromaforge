@@ -23,7 +23,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 lcc-fuzzkit = { workspace = true }
 lcc-testkit = { workspace = true }
-lopdf = { version = "0.45", default-features = false }
+lopdf = { version = "0.47", default-features = false }
 lcc-brand = { workspace = true }
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
 rustls-rustcrypto = "0.0.2-alpha"
