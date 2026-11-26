@@ -36,8 +36,8 @@ lcc-video-export = { workspace = true } # slideshow movies (H.264 + AAC MP4, Pro
 
 [dev-dependencies]
 lcc-fuzzkit = { workspace = true }
-lopdf = { version = "0.45", default-features = false }
-hayro = { version = "0.8", default-features = false }
+lopdf = { version = "0.47", default-features = false }
+hayro = { version = "0.9", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 lcc-video = { workspace = true }

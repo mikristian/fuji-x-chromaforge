@@ -17,7 +17,7 @@ audio-out = ["dep:cpal"]
 
 [dependencies]
 log = { workspace = true }
-cpal = { version = "0.15", optional = true } # Apache-2.0; links ALSA on Linux
+cpal = { version = "0.17", optional = true } # Apache-2.0; links ALSA on Linux
 
 # macOS and Windows play through cpal in every build (CoreAudio / WASAPI, no extra C libraries):
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
